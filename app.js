@@ -3,9 +3,10 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const BlogRouter = require("./controllers/Blogs");
+const UserRouter = require("./controllers/Users");
 const mongoose = require("mongoose");
 const logger = require("./utils/logger");
-const UserRouter = require("./controllers/Users");
+const middleware = require("./utils/middleware"); 
 
 app.use(express.json());
 app.use(cors());
@@ -21,21 +22,14 @@ mongoose
     logger.error("error connecting to MongoDB:", error.message);
   });
 
-app.use("/api/blogs", BlogRouter);
+// Apply tokenExtractor globally
+app.use(middleware.tokenExtractor);
+
+// Apply userExtractor only to /api/blogs routes
+app.use("/api/blogs", middleware.userExtractor, BlogRouter);
 app.use("/api/users", UserRouter);
 
-// ✅ Token Extractor Middleware
-const tokenExtractor = (request, response, next) => {
-  const authorization = request.get("Authorization");
-  if (authorization && authorization.toLowerCase().startsWith("bearer ")) {
-    request.token = authorization.substring(7);
-  }
-  next();
-};
-
-app.use(tokenExtractor);
-
-// ✅ Error handler middleware
+// Error handler middleware
 app.use((error, request, response, next) => {
   logger.error(error.message);
 
