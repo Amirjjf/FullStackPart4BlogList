@@ -5,6 +5,7 @@ const BlogRouter = require("./controllers/Blogs");
 const mongoose = require("mongoose");
 const cofig = require("./utils/config");
 const logger = require("./utils/logger");
+const UserRouter = require("./controllers/Users");
 
 app.use(express.json());
 app.use(cors());
@@ -22,6 +23,8 @@ mongoose
   });
 
 app.use("/api/Blogs", BlogRouter);
+app.use("/api/users", UserRouter);
+
 
 // Error handler middleware
 app.use((error, request, response, next) => {
@@ -31,8 +34,14 @@ app.use((error, request, response, next) => {
     return response.status(400).json({ error: error.message });
   }
 
+  if (error.code === 11000) {
+    // MongoDB duplicate key error for unique fields
+    return response.status(400).json({ error: "Username must be unique" });
+  }
+
   next(error);
 });
+
 
 
 module.exports = app;

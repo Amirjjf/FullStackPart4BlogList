@@ -4,6 +4,7 @@ const supertest = require("supertest");
 const mongoose = require("mongoose");
 const app = require("../app");
 const Blog = require("../models/Blog");
+const User = require("../models/User");
 
 const api = supertest(app);
 
@@ -26,6 +27,7 @@ const initialBlogs = [
 beforeEach(async () => {
   await Blog.deleteMany({});
   await Blog.insertMany(initialBlogs);
+  await User.deleteMany({});
 });
 
 describe("API tests for blog list", () => {
@@ -160,6 +162,97 @@ describe("API tests for blog list", () => {
     };
 
     await api.put(`/api/blogs/${nonExistentId}`).send(updatedBlog).expect(404);
+  });
+});
+
+describe("User API tests", () => {
+  // ✅ Test GET /api/users
+  test("GET /api/users returns all users", async () => {
+    const response = await api
+      .get("/api/users")
+      .expect(200)
+      .expect("Content-Type", /application\/json/);
+
+    assert.strictEqual(Array.isArray(response.body), true, "Expected response to be an array");
+  });
+
+  // ✅ Test POST /api/users
+  test("POST /api/users creates a new user", async () => {
+    const newUser = {
+      username: "john_doe",
+      name: "John Doe",
+      password: "password123",
+    };
+
+    await api
+      .post("/api/users")
+      .send(newUser)
+      .expect(201)
+      .expect("Content-Type", /application\/json/);
+
+    const usersAfterPost = await api.get("/api/users");
+    const usernames = usersAfterPost.body.map((user) => user.username);
+    assert.ok(usernames.includes(newUser.username), "Expected new user username to be present");
+  });
+
+  // ✅ Test POST /api/users with short password
+  test("POST /api/users returns 400 if password is too short", async () => {
+    const newUser = {
+      username: "short_password",
+      name: "Short Password",
+      password: "pw",
+    };
+
+    const response = await api.post("/api/users").send(newUser).expect(400);
+    assert.strictEqual(response.body.error, "Password must be at least 3 characters long");
+  });
+
+  // ✅ Test POST /api/users with short username
+  test("POST /api/users returns 400 if username is too short", async () => {
+    const newUser = {
+      username: "jd",
+      name: "Short Username",
+      password: "password123",
+    };
+
+    const response = await api.post("/api/users").send(newUser).expect(400);
+    assert.strictEqual(response.body.error, "Username must be at least 3 characters long");
+  });
+
+  // ✅ Test POST /api/users with missing username
+  test("POST /api/users returns 400 if username is missing", async () => {
+    const newUser = {
+      name: "Missing Username",
+      password: "password123",
+    };
+
+    const response = await api.post("/api/users").send(newUser).expect(400);
+    assert.strictEqual(response.body.error, "Username must be at least 3 characters long");
+  });
+
+  // ✅ Test POST /api/users with missing password
+  test("POST /api/users returns 400 if password is missing", async () => {
+    const newUser = {
+      username: "john_doe",
+      name: "Missing Password",
+    };
+
+    const response = await api.post("/api/users").send(newUser).expect(400);
+    assert.strictEqual(response.body.error, "Password must be at least 3 characters long");
+  });
+
+  // ✅ Test POST /api/users with duplicate username
+  test("POST /api/users returns 400 if username is not unique", async () => {
+    const newUser = {
+      username: "duplicate_user",
+      name: "Duplicate User",
+      password: "password123",
+    };
+
+    await api.post("/api/users").send(newUser).expect(201);
+
+    const response = await api.post("/api/users").send(newUser).expect(400);
+    assert.strictEqual(response.body.error, "Username must be unique");
   });
 });
 

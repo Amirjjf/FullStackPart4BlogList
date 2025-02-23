@@ -1,17 +1,22 @@
 const BlogRouter = require("express").Router();
 const Blog = require("../models/Blog");
+const User = require("../models/User");
 
-// GET all blogs
+// ✅ GET all blogs (populate user info)
 BlogRouter.get("/", async (request, response, next) => {
   try {
-    const blogs = await Blog.find({});
+    const blogs = await Blog.find({}).populate("user", {
+      username: 1,
+      name: 1,
+      id: 1,
+    });
     response.json(blogs);
   } catch (error) {
     next(error);
   }
 });
 
-// POST a new blog
+// ✅ POST a new blog (assign a random user as creator)
 BlogRouter.post("/", async (request, response, next) => {
   try {
     const { title, author, url, likes } = request.body;
@@ -20,21 +25,42 @@ BlogRouter.post("/", async (request, response, next) => {
       return response.status(400).json({ error: "Title and URL are required" });
     }
 
+    // ✅ Assign a random user from the database as the creator
+    const users = await User.find({});
+    if (users.length === 0) {
+      return response.status(400).json({ error: "No users found in the database" });
+    }
+    const randomUser = users[Math.floor(Math.random() * users.length)];
+
+    // ✅ Create and save the blog
     const blog = new Blog({
       title,
       author,
       url,
       likes: likes !== undefined ? likes : 0,
+      user: randomUser._id, // Reference the user's ID
     });
 
-    const result = await blog.save();
-    response.status(201).json(result);
+    const savedBlog = await blog.save();
+
+    // ✅ Add the blog to the user's list of blogs
+    randomUser.blogs = randomUser.blogs.concat(savedBlog._id);
+    await randomUser.save();
+
+    // ✅ Populate user info before responding
+    const populatedBlog = await Blog.findById(savedBlog._id).populate("user", {
+      username: 1,
+      name: 1,
+      id: 1,
+    });
+
+    response.status(201).json(populatedBlog);
   } catch (error) {
     next(error);
   }
 });
 
-// DELETE a blog by ID (4.13)
+// ✅ DELETE a blog by ID
 BlogRouter.delete("/:id", async (request, response, next) => {
   try {
     const deletedBlog = await Blog.findByIdAndDelete(request.params.id);
@@ -49,14 +75,18 @@ BlogRouter.delete("/:id", async (request, response, next) => {
   }
 });
 
-// PUT update a blog by ID (4.14)
+// ✅ PUT update a blog by ID
 BlogRouter.put("/:id", async (request, response, next) => {
   try {
     const updatedBlog = await Blog.findByIdAndUpdate(
       request.params.id,
       request.body,
       { new: true, runValidators: true }
-    );
+    ).populate("user", {
+      username: 1,
+      name: 1,
+      id: 1,
+    });
 
     if (!updatedBlog) {
       return response.status(404).json({ error: "Blog not found" });
