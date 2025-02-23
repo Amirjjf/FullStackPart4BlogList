@@ -26,13 +26,13 @@ const initialBlogs = [
 
 let token;
 
-// ✅ Clear the test database and add initial data before each test
+// Clear the test database and add initial data before each test
 beforeEach(async () => {
   await Blog.deleteMany({});
   await Blog.insertMany(initialBlogs);
   await User.deleteMany({});
 
-  // ✅ Create and login a user to get a token
+  // Create and login a user to get a token
   const newUser = {
     username: "test_user",
     name: "Test User",
@@ -144,7 +144,7 @@ describe("API tests for blog list", () => {
 
 // ✅ Test for 4.13: DELETE
 test("DELETE /api/blogs/:id deletes a blog post with token", async () => {
-  // ✅ Create a blog using the token of the authenticated user
+  // Create a blog using the token of the authenticated user
   const newBlog = {
     title: "Blog to be deleted",
     author: "Author Delete",
@@ -157,13 +157,13 @@ test("DELETE /api/blogs/:id deletes a blog post with token", async () => {
     .set("Authorization", `Bearer ${token}`)
     .send(newBlog);
 
-  // ✅ Delete the blog using the token of the same user
+  // Delete the blog using the token of the same user
   await api
     .delete(`/api/blogs/${createdBlog.body.id}`)
     .set("Authorization", `Bearer ${token}`)
     .expect(204);
 
-  // ✅ Verify the blog is deleted
+  // Verify the blog is deleted
   const blogsAfterDelete = await Blog.find({});
   const titles = blogsAfterDelete.map((blog) => blog.title);
   assert.ok(!titles.includes(newBlog.title), "Deleted blog title should not be present");
@@ -184,7 +184,7 @@ test("DELETE /api/blogs/:id deletes a blog post with token", async () => {
 
 // ✅ Test for 4.14: PUT
 test("PUT /api/blogs/:id updates the number of likes for a blog post", async () => {
-  // ✅ Create a blog using the token of the authenticated user
+  // Create a blog using the token of the authenticated user
   const newBlog = {
     title: "Blog to be updated",
     author: "Author Update",
@@ -197,7 +197,7 @@ test("PUT /api/blogs/:id updates the number of likes for a blog post", async () 
     .set("Authorization", `Bearer ${token}`)
     .send(newBlog);
 
-  // ✅ Update the number of likes
+  // Update the number of likes
   const updatedBlog = {
     title: createdBlog.body.title,
     author: createdBlog.body.author,
@@ -319,7 +319,7 @@ describe("User API tests", () => {
     assert.strictEqual(response.body.error, "Username must be unique");
   });
 
-  // ✅ Test POST /api/users/login returns a token
+  // Test POST /api/users/login returns a token
   test("POST /api/users/login returns a token", async () => {
     const loginResponse = await api
       .post("/api/users/login")

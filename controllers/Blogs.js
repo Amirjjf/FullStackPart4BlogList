@@ -4,7 +4,7 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
 
-// ✅ GET all blogs
+// GET all blogs
 BlogRouter.get("/", async (request, response, next) => {
   try {
     const blogs = await Blog.find({}).populate("user", {
@@ -84,7 +84,7 @@ BlogRouter.delete("/:id", async (request, response, next) => {
   }
 });
 
-// ✅ PUT update a blog by ID
+// PUT update a blog by ID
 BlogRouter.put("/:id", async (request, response, next) => {
   try {
     const { title, author, url, likes } = request.body;

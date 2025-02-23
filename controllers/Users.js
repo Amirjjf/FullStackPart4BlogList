@@ -3,7 +3,7 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt"); // or "bcryptjs"
 const jwt = require("jsonwebtoken");
 
-// ✅ GET all users (populate their blogs)
+// GET all users (populate their blogs)
 UserRouter.get("/", async (request, response, next) => {
   try {
     const users = await User.find({}).populate("blogs", {
@@ -18,7 +18,7 @@ UserRouter.get("/", async (request, response, next) => {
   }
 });
 
-// ✅ POST create a new user
+// POST create a new user
 UserRouter.post("/", async (request, response, next) => {
   try {
     const { username, name, password } = request.body;
@@ -52,7 +52,7 @@ UserRouter.post("/", async (request, response, next) => {
   }
 });
 
-// ✅ POST login user (Token Authentication)
+// POST login user (Token Authentication)
 UserRouter.post("/login", async (request, response) => {
   const { username, password } = request.body;
 
