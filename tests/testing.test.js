@@ -2,6 +2,7 @@ const { test, describe, beforeEach, after } = require("node:test");
 const assert = require("node:assert");
 const supertest = require("supertest");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 const app = require("../app");
 const Blog = require("../models/Blog");
 const User = require("../models/User");
@@ -23,11 +24,28 @@ const initialBlogs = [
   },
 ];
 
-// Clear the test database and add initial test blogs before each test
+let token;
+
+// ✅ Clear the test database and add initial data before each test
 beforeEach(async () => {
   await Blog.deleteMany({});
   await Blog.insertMany(initialBlogs);
   await User.deleteMany({});
+
+  // ✅ Create and login a user to get a token
+  const newUser = {
+    username: "test_user",
+    name: "Test User",
+    password: "password123",
+  };
+  await api.post("/api/users").send(newUser);
+
+  const loginResponse = await api.post("/api/users/login").send({
+    username: newUser.username,
+    password: newUser.password,
+  });
+
+  token = loginResponse.body.token; // Store the token for authenticated requests
 });
 
 describe("API tests for blog list", () => {
@@ -52,7 +70,7 @@ describe("API tests for blog list", () => {
   });
 
   // ✅ Test for 4.10
-  test("POST /api/blogs creates a new blog post", async () => {
+  test("POST /api/blogs creates a new blog post with token", async () => {
     const newBlog = {
       title: "New Blog Post",
       author: "John Doe",
@@ -62,6 +80,7 @@ describe("API tests for blog list", () => {
 
     await api
       .post("/api/blogs")
+      .set("Authorization", `Bearer ${token}`) // ✅ Include token
       .send(newBlog)
       .expect(201)
       .expect("Content-Type", /application\/json/);
@@ -71,6 +90,17 @@ describe("API tests for blog list", () => {
 
     const titles = blogsAfterPost.body.map((blog) => blog.title);
     assert.ok(titles.includes(newBlog.title), "Expected new blog title to be present");
+  });
+
+  test("POST /api/blogs returns 401 if token is missing", async () => {
+    const newBlog = {
+      title: "Unauthorized Blog",
+      author: "Unauthorized User",
+      url: "https://example.com/unauthorized",
+      likes: 10,
+    };
+
+    await api.post("/api/blogs").send(newBlog).expect(401);
   });
 
   // ✅ Test for 4.11
@@ -83,6 +113,7 @@ describe("API tests for blog list", () => {
 
     const response = await api
       .post("/api/blogs")
+      .set("Authorization", `Bearer ${token}`) // ✅ Include token
       .send(newBlog)
       .expect(201)
       .expect("Content-Type", /application\/json/);
@@ -98,7 +129,7 @@ describe("API tests for blog list", () => {
       likes: 5,
     };
 
-    await api.post("/api/blogs").send(newBlog).expect(400);
+    await api.post("/api/blogs").set("Authorization", `Bearer ${token}`).send(newBlog).expect(400);
   });
 
   test("POST /api/blogs returns 400 if url is missing", async () => {
@@ -108,48 +139,81 @@ describe("API tests for blog list", () => {
       likes: 5,
     };
 
-    await api.post("/api/blogs").send(newBlog).expect(400);
+    await api.post("/api/blogs").set("Authorization", `Bearer ${token}`).send(newBlog).expect(400);
   });
 
-  // ✅ Test for 4.13: DELETE
-  test("DELETE /api/blogs/:id deletes a blog post", async () => {
+// ✅ Test for 4.13: DELETE
+test("DELETE /api/blogs/:id deletes a blog post with token", async () => {
+  // ✅ Create a blog using the token of the authenticated user
+  const newBlog = {
+    title: "Blog to be deleted",
+    author: "Author Delete",
+    url: "https://example.com/delete-blog",
+    likes: 5,
+  };
+
+  const createdBlog = await api
+    .post("/api/blogs")
+    .set("Authorization", `Bearer ${token}`)
+    .send(newBlog);
+
+  // ✅ Delete the blog using the token of the same user
+  await api
+    .delete(`/api/blogs/${createdBlog.body.id}`)
+    .set("Authorization", `Bearer ${token}`)
+    .expect(204);
+
+  // ✅ Verify the blog is deleted
+  const blogsAfterDelete = await Blog.find({});
+  const titles = blogsAfterDelete.map((blog) => blog.title);
+  assert.ok(!titles.includes(newBlog.title), "Deleted blog title should not be present");
+});
+
+
+  test("DELETE /api/blogs/:id returns 401 if token is missing", async () => {
     const blogsAtStart = await Blog.find({});
     const blogToDelete = blogsAtStart[0];
 
-    await api.delete(`/api/blogs/${blogToDelete.id}`).expect(204);
-
-    const blogsAfterDelete = await Blog.find({});
-    assert.strictEqual(blogsAfterDelete.length, blogsAtStart.length - 1);
-
-    const titles = blogsAfterDelete.map((blog) => blog.title);
-    assert.ok(!titles.includes(blogToDelete.title), "Deleted blog title should not be present");
+    await api.delete(`/api/blogs/${blogToDelete.id}`).expect(401);
   });
 
   test("DELETE /api/blogs/:id returns 404 if blog does not exist", async () => {
     const nonExistentId = new mongoose.Types.ObjectId();
-    await api.delete(`/api/blogs/${nonExistentId}`).expect(404);
+    await api.delete(`/api/blogs/${nonExistentId}`).set("Authorization", `Bearer ${token}`).expect(404);
   });
 
-  // ✅ Test for 4.14: PUT
-  test("PUT /api/blogs/:id updates the number of likes for a blog post", async () => {
-    const blogsAtStart = await Blog.find({});
-    const blogToUpdate = blogsAtStart[0];
+// ✅ Test for 4.14: PUT
+test("PUT /api/blogs/:id updates the number of likes for a blog post", async () => {
+  // ✅ Create a blog using the token of the authenticated user
+  const newBlog = {
+    title: "Blog to be updated",
+    author: "Author Update",
+    url: "https://example.com/update-blog",
+    likes: 5,
+  };
 
-    const updatedBlog = {
-      title: blogToUpdate.title,
-      author: blogToUpdate.author,
-      url: blogToUpdate.url,
-      likes: blogToUpdate.likes + 10,
-    };
+  const createdBlog = await api
+    .post("/api/blogs")
+    .set("Authorization", `Bearer ${token}`)
+    .send(newBlog);
 
-    const response = await api
-      .put(`/api/blogs/${blogToUpdate.id}`)
-      .send(updatedBlog)
-      .expect(200)
-      .expect("Content-Type", /application\/json/);
+  // ✅ Update the number of likes
+  const updatedBlog = {
+    title: createdBlog.body.title,
+    author: createdBlog.body.author,
+    url: createdBlog.body.url,
+    likes: createdBlog.body.likes + 10,
+  };
 
-    assert.strictEqual(response.body.likes, blogToUpdate.likes + 10, "Likes should be updated");
-  });
+  const response = await api
+    .put(`/api/blogs/${createdBlog.body.id}`)
+    .send(updatedBlog)
+    .expect(200)
+    .expect("Content-Type", /application\/json/);
+
+  assert.strictEqual(response.body.likes, createdBlog.body.likes + 10, "Likes should be updated");
+});
+
 
   test("PUT /api/blogs/:id returns 404 if blog does not exist", async () => {
     const nonExistentId = new mongoose.Types.ObjectId();
@@ -253,6 +317,29 @@ describe("User API tests", () => {
 
     const response = await api.post("/api/users").send(newUser).expect(400);
     assert.strictEqual(response.body.error, "Username must be unique");
+  });
+
+  // ✅ Test POST /api/users/login returns a token
+  test("POST /api/users/login returns a token", async () => {
+    const loginResponse = await api
+      .post("/api/users/login")
+      .send({
+        username: "test_user",
+        password: "password123",
+      })
+      .expect(200);
+
+    assert.ok(loginResponse.body.token, "Expected login to return a token");
+  });
+
+  test("POST /api/users/login returns 401 for invalid credentials", async () => {
+    await api
+      .post("/api/users/login")
+      .send({
+        username: "test_user",
+        password: "wrongpassword",
+      })
+      .expect(401);
   });
 });
 

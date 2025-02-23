@@ -1,6 +1,7 @@
 const UserRouter = require("express").Router();
 const User = require("../models/User");
 const bcrypt = require("bcrypt"); // or "bcryptjs"
+const jwt = require("jsonwebtoken");
 
 // ✅ GET all users (populate their blogs)
 UserRouter.get("/", async (request, response, next) => {
@@ -22,32 +23,22 @@ UserRouter.post("/", async (request, response, next) => {
   try {
     const { username, name, password } = request.body;
 
-    // ✅ Validate username and password
     if (!username || username.length < 3) {
-      return response.status(400).json({
-        error: "Username must be at least 3 characters long",
-      });
+      return response.status(400).json({ error: "Username must be at least 3 characters long" });
     }
 
     if (!password || password.length < 3) {
-      return response.status(400).json({
-        error: "Password must be at least 3 characters long",
-      });
+      return response.status(400).json({ error: "Password must be at least 3 characters long" });
     }
 
-    // ✅ Check if username is already taken
     const existingUser = await User.findOne({ username });
     if (existingUser) {
-      return response.status(400).json({
-        error: "Username must be unique",
-      });
+      return response.status(400).json({ error: "Username must be unique" });
     }
 
-    // ✅ Hash the password
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // ✅ Create and save the user
     const user = new User({
       username,
       name,
@@ -59,6 +50,32 @@ UserRouter.post("/", async (request, response, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ✅ POST login user (Token Authentication)
+UserRouter.post("/login", async (request, response) => {
+  const { username, password } = request.body;
+
+  const user = await User.findOne({ username });
+  const passwordCorrect = user ? await bcrypt.compare(password, user.passwordHash) : false;
+
+  if (!user || !passwordCorrect) {
+    return response.status(401).json({ error: "Invalid username or password" });
+  }
+
+  const userForToken = {
+    username: user.username,
+    id: user._id,
+  };
+
+  // Token expires in 1 hour
+  const token = jwt.sign(userForToken, process.env.SECRET, { expiresIn: "1h" });
+
+  response.status(200).send({
+    token,
+    username: user.username,
+    name: user.name,
+  });
 });
 
 module.exports = UserRouter;
