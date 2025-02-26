@@ -6,7 +6,10 @@ const BlogRouter = require("./controllers/Blogs");
 const UserRouter = require("./controllers/Users");
 const mongoose = require("mongoose");
 const logger = require("./utils/logger");
-const middleware = require("./utils/middleware"); 
+const middleware = require("./utils/middleware");
+
+// ✅ Import the testing router
+const TestingRouter = require("./controllers/testing");
 
 app.use(express.json());
 app.use(cors());
@@ -22,14 +25,19 @@ mongoose
     logger.error("error connecting to MongoDB:", error.message);
   });
 
-// Apply tokenExtractor globally
+// ✅ Apply tokenExtractor globally
 app.use(middleware.tokenExtractor);
 
-// Apply userExtractor only to /api/blogs routes
+// ✅ Apply userExtractor only to /api/blogs routes
 app.use("/api/blogs", middleware.userExtractor, BlogRouter);
 app.use("/api/users", UserRouter);
 
-// Error handler middleware
+// ✅ Conditionally use the testing router in test environment
+if (process.env.NODE_ENV === "test") {
+  app.use("/api/testing", TestingRouter);
+}
+
+// ✅ Error handler middleware
 app.use((error, request, response, next) => {
   logger.error(error.message);
 
