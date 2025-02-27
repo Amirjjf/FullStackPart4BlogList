@@ -14,15 +14,18 @@ const TestingRouter = require("./controllers/testing");
 app.use(express.json());
 app.use(cors());
 
-logger.info("connecting to", process.env.MONGODB_URL);
+// ✅ Select the correct MongoDB URL based on NODE_ENV
+const MONGO_URL = process.env.NODE_ENV === "test" ? process.env.TEST_MONGODB_URL : process.env.MONGODB_URL;
+
+logger.info(`Connecting to ${process.env.NODE_ENV === "test" ? "TEST" : "NORMAL"} database:`, MONGO_URL);
 
 mongoose
-  .connect(process.env.MONGODB_URL)
+  .connect(MONGO_URL)
   .then(() => {
-    logger.info("connected to MongoDB");
+    logger.info(`Connected to ${process.env.NODE_ENV === "test" ? "TEST" : "NORMAL"} MongoDB`);
   })
   .catch((error) => {
-    logger.error("error connecting to MongoDB:", error.message);
+    logger.error("Error connecting to MongoDB:", error.message);
   });
 
 // ✅ Apply tokenExtractor globally
